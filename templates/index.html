@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ta">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Tamil Tokenizer Tool</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #f4f4f4;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+    }
+    .container {
+      max-width: 1000px;
+      margin: auto;
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px #aaa;
+    }
+    textarea, select, input[type="file"] {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      margin-bottom: 20px;
+      font-size: 16px;
+    }
+    button {
+      padding: 10px 20px;
+      background-color: #007bff;
+      border: none;
+      color: white;
+      font-size: 16px;
+      margin-right: 10px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    .token-box {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .token {
+      padding: 5px 10px;
+      background: #e0e0e0;
+      border-radius: 5px;
+    }
+    .token input {
+      font-size: 14px;
+      padding: 4px;
+      width: 100px;
+    }
+    .token-label {
+      font-weight: bold;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1>Tamil Tokenizer</h1>
+
+    <label>Enter Tamil Sentence or Upload File:</label>
+    <textarea id="inputText" placeholder="உதாரணம்: மெல்ல கதவைத் தட்டினார்"></textarea>
+    <input type="file" id="fileInput" accept=".txt">
+
+    <label>Select Tokenization Algorithm:</label>
+    <select id="algorithm">
+      <option value="xlmr">XLM-R (e.g., மெல்ல கதவைத் தட்டினார் → மெல்ல _ கதவைத் _ தட்டினார்)</option>
+      <option value="sentencepiece">SentencePiece (e.g., நாடாளுமன்றமும் → நாடாளுமன்றம் + உம்)</option>
+    </select>
+
+    <button onclick="tokenize()">Tokenize</button>
+
+    <div id="outputArea">
+      <div class="token-label">Tokenized Output:</div>
+      <div id="tokens" class="token-box"></div>
+
+      <div style="margin-top: 20px;">
+        <button onclick="selectAllTokens()">Select All</button>
+        <button onclick="saveCorrections()">Save Corrections</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let originalTokens = [];
+
+    function tokenize() {
+      const text = document.getElementById("inputText").value;
+      const algo = document.getElementById("algorithm").value;
+      const file = document.getElementById("fileInput").files[0];
+
+      const formData = new FormData();
+      formData.append("algorithm", algo);
+
+      if (file) {
+        formData.append("file", file);
+      } else {
+        formData.append("text", text);
+      }
+
+      fetch("/tokenize", {
+        method: "POST",
+        body: formData,
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (!data.tokens || !Array.isArray(data.tokens)) {
+          alert("Error during tokenization: Invalid response from server.");
+          return;
+        }
+        displayTokens(data.tokens);
+      })
+      .catch(err => {
+        console.error("Tokenization error:", err);
+        alert("Error during tokenization: " + err.message);
+      });
+    }
+
+    function displayTokens(tokens) {
+      const tokensDiv = document.getElementById("tokens");
+      tokensDiv.innerHTML = "";
+      originalTokens = tokens;
+
+      if (tokens.length === 0) {
+        tokensDiv.innerHTML = "<p>No tokens returned.</p>";
+        return;
+      }
+
+      tokens.forEach((tok, idx) => {
+        const div = document.createElement("div");
+        div.className = "token";
+        div.innerHTML = `
+          <input type="text" id="tok-${idx}" value="${tok}">
+        `;
+        tokensDiv.appendChild(div);
+      });
+    }
+
+    function selectAllTokens() {
+      originalTokens.forEach((tok, idx) => {
+        const input = document.getElementById(`tok-${idx}`);
+        input.focus();
+        input.select();
+      });
+    }
+
+    function saveCorrections() {
+      const correctedTokens = originalTokens.map((_, idx) => {
+        return document.getElementById(`tok-${idx}`).value.trim();
+      });
+
+      fetch("/save_correction", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ original: originalTokens, corrected: correctedTokens }),
+      })
+      .then(res => res.json())
+      .then(data => alert(data.message))
+      .catch(err => alert("Failed to save corrections: " + err));
+    }
+  </script>
+</body>
+</html>
