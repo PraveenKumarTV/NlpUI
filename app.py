@@ -45,7 +45,7 @@ def tokenize(inplines):
 
 
 def getTokens(file_path):
-  with open(file_path,"r") as file:
+  with open(file_path,"r",encoding="utf-8") as file:
       inplines=file.readlines()
       return tokenize(inplines)
 tokens=getTokens("filtered_output_file.txt")
